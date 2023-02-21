@@ -1,0 +1,11 @@
+#DtsodV23
+
+telegramUserId: [
+    {
+       instagramUserId: "taldybayeff";
+       # optional, default: true
+       notifyOnFollowing: true;
+       # optional, default: true
+       notifyOnUnfollowing: true;
+    }
+];

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>preview</LangVersion>
+    </PropertyGroup>
+    
+    <ItemGroup>
+      <PackageReference Include="Telegram.Bot" Version="18.0.0" />
+      <PackageReference Include="Telegram.Bots.Extensions.Polling" Version="5.9.0" />
+    </ItemGroup>
+    <ItemGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <ProjectReference Include="..\DTLib\DTLib.Logging\DTLib.Logging.csproj" />
+        <ProjectReference Include="..\DTLib\DTLib.Dtsod\DTLib.Dtsod.csproj" />
+        <ProjectReference Include="..\DTLib\DTLib\DTLib.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition=" '$(Configuration)' != 'Debug' ">
+        <PackageReference Include="DTLib.Dtsod" Version="1.1.1" />
+        <PackageReference Include="DTLib.Logging" Version="1.1.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="resources\**\*" />
+      <EmbeddedResource Include="resources\**\*" />
+    </ItemGroup>
+
+</Project>
