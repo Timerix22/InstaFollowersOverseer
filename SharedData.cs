@@ -4,13 +4,10 @@ public static class SharedData
 {
     internal const string EmbeddedResourcesPrefix = "InstaFollowersOverseer.resources";
     
-#nullable disable
-    internal static Config config;
-    internal static UserSettings userSettings;
-#nullable enable
-    
-    public static readonly ContextLogger MainLogger = new ContextLogger("main",new CompositeLogger(
-            new ConsoleLogger(),
-            new FileLogger("logs","InstaFollowersOverseer"))
-        );
+    internal static Config CurrentConfig = new("config");
+    internal static UsersData CurrentUsersData = new("users-data");
+
+    public static readonly CompositeLogger ParentLogger = new(
+        new ConsoleLogger(),
+        new FileLogger("logs", "InstaFollowersOverseer"));
 }
