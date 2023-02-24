@@ -1,7 +1,9 @@
 ﻿global using System;
-global using System.Threading.Tasks;
-global using System.Linq;
 global using System.Collections.Generic;
+global using System.Linq;
+global using System.Text;
+global using System.Threading;
+global using System.Threading.Tasks;
 global using DTLib;
 global using DTLib.Filesystem;
 global using DTLib.Extensions;
@@ -11,8 +13,6 @@ global using File = DTLib.Filesystem.File;
 global using Directory = DTLib.Filesystem.Directory;
 global using Path = DTLib.Filesystem.Path;
 global using static InstaFollowersOverseer.SharedData;
-using System.Text;
-using System.Threading;
 
 namespace InstaFollowersOverseer;
 
@@ -40,15 +40,21 @@ static class Program
             {
                 Stop();
                 Thread.Sleep(1000);
-                MainLogger.LogInfo("all have cancelled");
+                Overseer.Stop();
                 e.Cancel = false;
             };
 
-            Instagram.InstagramWrapper.Init();
-            Telegram.TelegramWrapper.Init();
+            Task[] tasks={
+                Instagram.InstagramWrapper.InitAsync(),
+                TelegramWrapper.InitAsync()
+            };
+            Task.WaitAll(tasks);
+            
+            Overseer.Start();
 
             Task.Delay(-1, MainCancel.Token).GetAwaiter().GetResult();
             Thread.Sleep(1000);
+            MainLogger.LogInfo("all have cancelled");
         }
         catch (OperationCanceledException) {}
         catch (Exception ex)

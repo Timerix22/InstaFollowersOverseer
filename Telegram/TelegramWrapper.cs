@@ -1,19 +1,18 @@
 using System.Net.Http;
-using System.Threading;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using InstaFollowersOverseer.Instagram;
 
-namespace InstaFollowersOverseer.Telegram;
+namespace InstaFollowersOverseer;
 
 public static class TelegramWrapper
 {
     private static ContextLogger TelegramLogger = new("telegram", ParentLogger);
     private static TelegramBotClient Bot=null!;
 
-    public static async void Init()
+    public static async Task InitAsync()
     {
         try
         {
@@ -35,7 +34,7 @@ public static class TelegramWrapper
             };
             TelegramLogger.LogInfo("bot starting recieving long polls");
             Bot.StartReceiving(BotApiUpdateHandler, BotApiExceptionHandler, receiverOptions, Program.MainCancelToken);
-            TelegramLogger.LogInfo("telegram wrapper have initialized successfully");
+            TelegramLogger.LogInfo("telegram wrapper initialized successfully");
         }
         catch (OperationCanceledException) {}
         catch (Exception ex)
@@ -50,20 +49,34 @@ public static class TelegramWrapper
         TelegramLogger.LogError(ex);
         return Task.CompletedTask;
     }
-
-    static async Task SendInfoReply(string text, Message replyToMessage)
+    
+    /// parses text from markdown to html and sends to telegram chat
+    public static async Task SendMessage(ChatId chatId, HtmlMessageBuilder message, int? replyToMesId=null)
     {
-        TelegramLogger.LogInfo(text);
-        await Bot.SendTextMessageAsync(replyToMessage.Chat, text, 
-            replyToMessageId: replyToMessage.MessageId, 
-            parseMode:ParseMode.MarkdownV2);
+        string html = message.ToHtml();
+        await Bot.SendTextMessageAsync(chatId, html,
+            replyToMessageId: replyToMesId,
+            parseMode: ParseMode.Html);
+        message.Clear();
     }
-    static async Task SendErrorReply(string text, Message replyToMessage)
+
+    public static async Task SendInfo(ChatId chatId, HtmlMessageBuilder message, int? replyToMesId=null)
     {
-        TelegramLogger.LogWarn(text);
-        await Bot.SendTextMessageAsync(replyToMessage.Chat, "error: "+text, 
-            replyToMessageId: replyToMessage.MessageId, 
-            parseMode:ParseMode.MarkdownV2);
+        TelegramLogger.LogInfo(message);
+        await SendMessage(chatId, message, replyToMesId);
+    }
+    
+    public static async Task SendError(ChatId chatId, HtmlMessageBuilder message, int? replyToMesId=null)
+    {
+        TelegramLogger.LogWarn(message);
+        await SendMessage(chatId, new HtmlMessageBuilder().BeginStyle(TextStyle.Bold | TextStyle.Italic)
+            .Text("error: ").EndStyle().Text(message), replyToMesId);
+    }
+    public static async Task SendError(ChatId chatId, Exception ex, int? replyToMesId=null)
+    {
+        TelegramLogger.LogWarn(ex);
+        await SendMessage(chatId, new HtmlMessageBuilder().BeginStyle(TextStyle.Bold | TextStyle.Italic)
+            .Text("error: ").EndStyle().Text(ex.Message), replyToMesId);
     }
     
     private static async Task BotApiUpdateHandler(ITelegramBotClient bot, Update update, CancellationToken cls)
@@ -107,28 +120,66 @@ public static class TelegramWrapper
 
     private static async Task ExecCommandAsync(string command, string[] args, Message message)
     {
-        switch (command)
+        try
         {
-            case "start":
-                await Bot.SendTextMessageAsync(message.Chat, "hi");
-                break;
-            case "oversee":
+            HtmlMessageBuilder rb = new();
+            long senderId = message.From?.Id ?? message.Chat.Id;
+            string senderName = message.From?.FirstName ?? message.Chat.FirstName ??
+                message.Chat.Username ?? "UnknownUser";
+            switch (command)
             {
-                string usernameOrUrl = args[0];
-                await SendInfoReply($"searching for instagram user <{usernameOrUrl}>", message);
-                var user = await InstagramWrapper.GetUserAsync(usernameOrUrl);
-                if (user is null)
+                case "start":
+                    await SendInfo(message.Chat, rb.Text("bot started"));
+                    break;
+                case "oversee":
                 {
-                    await SendErrorReply($"user **{usernameOrUrl}** doesnt exist", message);
-                    return;
+                    string usernameOrUrl = args[0];
+                    await SendInfo(message.Chat, rb.Text("searching for instagram user"), message.MessageId);
+                    var user = await InstagramWrapper.TryGetUserAsync(usernameOrUrl);
+                    if (user is null)
+                    {
+                        await SendError(message.Chat, rb.Text("user ").Text(usernameOrUrl).Text(" not found"));
+                        return;
+                    }
+                    await SendInfo(message.Chat, rb.Text("user ").Text(usernameOrUrl).Text(" found"));
+                    // user id or chat id
+                    CurrentUsersData.AddOrSet(senderId, new InstagramObservableParams(usernameOrUrl));
+                    CurrentUsersData.SaveToFile();
+                    break;
                 }
-                CurrentUsersData.AddOrSet(message.Chat.Id.ToString(), new InstagramObservableParams(usernameOrUrl));
-                CurrentUsersData.SaveToFile();
-                break;
+                case "list":
+                {
+                    var userData = CurrentUsersData.Get(senderId);
+                    if (userData is null)
+                    {
+                        await SendError(message.Chat, rb.Text("no data for user"), message.MessageId);
+                        return;
+                    }
+
+                    rb.Text(userData.Count).Text("instagram users:\n");
+                    foreach (var iuParams in userData)
+                    {
+                        rb.BeginStyle(TextStyle.Bold).Text(iuParams.instagramUsername).EndStyle().Text(" - ");
+                        var iu = await InstagramWrapper.TryGetUserAsync(iuParams.instagramUsername);
+                        rb.Text(iu is null ? "user no longer exists" : iu.FullName);
+                        rb.SetUrl("https://www.instagram.com/"+iuParams.instagramUsername)
+                            .BeginStyle(TextStyle.Link)
+                            .Text(iuParams.instagramUsername)
+                            .EndStyle().Text('\n');
+                    }
+
+                    await SendInfo(message.Chat, rb, message.MessageId);
+                    break;
+                }
+                default:
+                    await SendError(message.Chat, rb.Text("ivalid command"), message.MessageId);
+                    break;
             }
-            default:
-                await SendErrorReply("ivalid command", message);
-                break;
+        }
+        catch(OperationCanceledException){}
+        catch (Exception ex)
+        {
+            await SendError(message.Chat, ex);
         }
     }
 }

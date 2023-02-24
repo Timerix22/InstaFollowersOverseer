@@ -19,6 +19,8 @@
     <!--third-party dependencies-->
     <ItemGroup>
       <PackageReference Include="InstaSharper" Version="1.4.82" />
+      <PackageReference Include="MarkdownDeep.NET.Core" Version="1.5.0.4" />
+      <PackageReference Include="MarkedNet" Version="2.1.4" />
       <PackageReference Include="Telegram.Bot" Version="18.0.0" />
       <!--PackageReference Include="Telegram.Bots.Extensions.Polling" Version="5.9.0" /-->
     </ItemGroup>

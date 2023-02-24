@@ -6,6 +6,7 @@ public class Config : DtsodFile
     public string botToken;
     public string instagramLogin;
     public string instagramPassword;
+    public double checksIntervalMinutes;
     #nullable enable
 
     public Config(string fileNameWithoutExt) : base(fileNameWithoutExt) { }
@@ -18,9 +19,11 @@ public class Config : DtsodFile
             botToken = dtsod[nameof(botToken)];
             instagramLogin = dtsod[nameof(instagramLogin)];
             instagramPassword = dtsod[nameof(instagramPassword)];
+            checksIntervalMinutes = dtsod[nameof(checksIntervalMinutes)];
         }
         catch (Exception ex)
         {
+            LoadedSuccessfully = false;
             throw new Exception($"your {FileName} format is invalid\n"
                                 + $"See {FileExampleName}", innerException: ex);
         }
@@ -32,7 +35,8 @@ public class Config : DtsodFile
         {
             { nameof(botToken), botToken },
             { nameof(instagramLogin), instagramLogin },
-            { nameof(instagramPassword), instagramPassword }
+            { nameof(instagramPassword), instagramPassword },
+            { nameof(checksIntervalMinutes), checksIntervalMinutes }
         };
         return d;
     }

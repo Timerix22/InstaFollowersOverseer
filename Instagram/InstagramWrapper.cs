@@ -10,7 +10,7 @@ public static class InstagramWrapper
     public static ContextLogger InstagramLogger = new("instagram",ParentLogger);
     private static IInstaApi Api=null!;
     
-    public static async void Init()
+    public static async Task InitAsync()
     {
         try
         {
@@ -27,13 +27,13 @@ public static class InstagramWrapper
                     UserName = CurrentConfig.instagramLogin,
                     Password = CurrentConfig.instagramPassword
                 })
-                .SetRequestDelay(RequestDelay.FromSeconds(0, 1))
+                .SetRequestDelay(RequestDelay.FromSeconds(5, 10))
                 .Build();
             InstagramLogger.LogInfo("instagram login starting");
             var rezult= await Api.LoginAsync();
             if (!rezult.Succeeded)
                 throw new Exception("login exception:\n" + rezult.Info + '\n' + rezult.Value);
-            InstagramLogger.LogInfo("instagram wrapper have initialized and connected successfully");
+            InstagramLogger.LogInfo("instagram wrapper initialized and connected successfully");
         }
         catch (OperationCanceledException) {}
         catch (Exception ex)
@@ -43,7 +43,7 @@ public static class InstagramWrapper
         }
     }
 
-    public static async Task<InstaUser?> GetUserAsync(string usernameOrUrl)
+    public static async Task<InstaUser?> TryGetUserAsync(string usernameOrUrl)
     {
         // url
         if (usernameOrUrl.Contains('/'))
@@ -54,5 +54,27 @@ public static class InstagramWrapper
         // username
         var u=await Api.GetUserAsync(usernameOrUrl);
         return u.Succeeded ? u.Value : null;
+    }
+
+    private static Dictionary<string, IEnumerable<string>> FollowersDict=new();
+
+    /// may took long time if user have many followers
+    public static async Task<FollowersDiff> GetFollowersDiffAsync(string instaUser)
+    {
+        if (await TryGetUserAsync(instaUser) is null)
+            throw new Exception($"instagram user {instaUser} doesnt exist");
+        var maybeFollowers = await Api.GetUserFollowersAsync(instaUser, PaginationParameters.Empty);
+        if (!maybeFollowers.Succeeded)
+            throw new Exception($"can't get followers of user {instaUser}");
+        var currentFollowers = maybeFollowers.Value.Select(f=>f.UserName).ToList();
+        if(!FollowersDict.TryGetValue(instaUser, out var _prevFollowers))
+        {
+            FollowersDict.Add(instaUser, currentFollowers);
+            return FollowersDiff.Empty;
+        }
+        var prevFollowers = _prevFollowers.ToList();
+        var unfollowed = prevFollowers.Except(currentFollowers).ToList();
+        var followed = currentFollowers.Except(prevFollowers).ToList();
+        return new FollowersDiff(unfollowed, followed);
     }
 }

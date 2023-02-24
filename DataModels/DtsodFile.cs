@@ -4,6 +4,8 @@ namespace InstaFollowersOverseer;
 
 public abstract class DtsodFile
 {
+    public bool LoadedSuccessfully = false;
+    
     public readonly string FileNameWithoutExt;
     public readonly string FileName;
     public readonly string FileExampleName;
@@ -42,6 +44,8 @@ public abstract class DtsodFile
 
         string fileText = File.ReadAllText(FileName);
         Program.MainLogger.LogDebug(fileText);
+        // should be set to false on LoadFromFile() errors
+        LoadedSuccessfully = true;
         return new DtsodV23(fileText);
     }
 
@@ -51,11 +55,14 @@ public abstract class DtsodFile
     
     public void SaveToFile()
     {
+        if(!LoadedSuccessfully)
+            return;
+        
+        if(File.Exists(FileName))
+            CreateBackup();
         Program.MainLogger.LogInfo($"saving file {FileName}");
         string dtsodStr = ToDtsod().ToString();
         Program.MainLogger.LogDebug(dtsodStr);
-        if(File.Exists(FileName))
-            CreateBackup();
         File.OpenWrite(FileName)
             .FluentWriteString("#DtsodV23\n")
             .FluentWriteString(dtsodStr)

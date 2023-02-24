@@ -2,8 +2,8 @@ namespace InstaFollowersOverseer;
 
 public class UsersData : DtsodFile
 {
-    private Dictionary<string, List<InstagramObservableParams>> usersData=new();
-    
+    public Dictionary<string, List<InstagramObservableParams>> UsersDict=new();
+
     public UsersData(string fileName) : base(fileName) {}
     
     public override void LoadFromFile()
@@ -19,11 +19,12 @@ public class UsersData : DtsodFile
                 foreach (DtsodV23 _overseeParams in uset.Value)
                     oparams.Add(new InstagramObservableParams(_overseeParams));
 
-                usersData.Add(telegramUserId, oparams);
+                UsersDict.Add(telegramUserId, oparams);
             }
         }
         catch (Exception ex)
         {
+            LoadedSuccessfully = false;
             throw new Exception($"your {FileName} format is invalid\n"
                                 + $"See {FileExampleName}", innerException: ex);
         }
@@ -32,7 +33,7 @@ public class UsersData : DtsodFile
     public override DtsodV23 ToDtsod()
     {
         var b = new DtsodV23();
-        foreach (var userS in usersData) 
+        foreach (var userS in UsersDict) 
             b.Add(userS.Key, 
                 userS.Value.Select<InstagramObservableParams, DtsodV23>(iop =>
                     iop.ToDtsod()
@@ -40,28 +41,30 @@ public class UsersData : DtsodFile
         return b;
     }
 
-    public List<InstagramObservableParams> Get(string telegramUserId)
+    public List<InstagramObservableParams>? Get(long telegramUserId)
     {
-        if (!usersData.TryGetValue(telegramUserId, out var overseeParams))
-            throw new Exception($"there is no settings for user {telegramUserId}");
+        string userIdStr = telegramUserId.ToString();
+        if (!UsersDict.TryGetValue(userIdStr, out var overseeParams))
+            return null;
         return overseeParams;
     }
 
-    public void AddOrSet(string telegramUserId, InstagramObservableParams instagramObservableParams)
+    public void AddOrSet(long telegramUserId, InstagramObservableParams instagramObservableParams)
     {
         // Add
         // doesnt contain settings for telegramUserId
-        if (!usersData.TryGetValue(telegramUserId, out var thisUsersData))
+        string userIdStr = telegramUserId.ToString();
+        if (!UsersDict.TryGetValue(userIdStr, out var thisUsersData))
         {
-            usersData.Add(telegramUserId, new (){ instagramObservableParams });
+            UsersDict.Add(userIdStr, new (){ instagramObservableParams });
             return;
         }
 
         // Set
-        // settings for telegramUserId contain InstagramObservableParams with instagramObservableParams.instagramUserId
+        // settings for telegramUserId contain InstagramObservableParams with instagramObservableParams.instagramUsername
         for (var i = 0; i < thisUsersData.Count; i++)
         {
-            if (thisUsersData[i].instagramUserId == instagramObservableParams.instagramUserId)
+            if (thisUsersData[i].instagramUsername == instagramObservableParams.instagramUsername)
             {
                 thisUsersData[i] = instagramObservableParams;
                 return;
@@ -69,11 +72,11 @@ public class UsersData : DtsodFile
         }
         
         // Add
-        // doesnt contain InstagramObservableParams with instagramObservableParams.instagramUserId
+        // doesnt contain InstagramObservableParams with instagramObservableParams.instagramUsername
         thisUsersData.Add(instagramObservableParams);
     }
 
-    public void AddOrSet(string telegramUserId, IEnumerable<InstagramObservableParams> instagramObservableParams)
+    public void AddOrSet(long telegramUserId, IEnumerable<InstagramObservableParams> instagramObservableParams)
     {
         foreach (var p in instagramObservableParams) 
             AddOrSet(telegramUserId, p);
